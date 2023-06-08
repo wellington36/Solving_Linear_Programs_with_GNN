@@ -1,1 +1,1 @@
-# Solving_Linear_Programs_with_GNN
+# Solving Linear Programs with GNN
