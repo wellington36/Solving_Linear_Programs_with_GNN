@@ -34,7 +34,7 @@ def generate_random_linear_program(num_variables, num_constraints, bound):
     # Adjust the constraint matrix and right-hand side based on the constraint types
     for i in range(num_constraints):
         if constraint_types[i] == 1:  # Equality constraint
-            A[i] = np.random.choice([0, 1], p=[0.95, 0.05]) * A[i]  # Randomly multiply constraint coefficients by 0 or 1
+            A[i] = np.random.choice([0, 1], p=[0.80, 0.20]) * A[i]  # Randomly multiply constraint coefficients by 0 or 1
             b[i] = np.dot(A[i], np.random.rand(num_variables))  # Randomly generate a feasible solution
 
     # Return the generated linear program
@@ -117,7 +117,6 @@ def generate_and_solve_batches(num_batches, num_variables, num_constraints, out_
             batches_solutions.append(torch.zeros(num_variables, dtype=torch.float32))
             batches_feasibility.append(torch.tensor(1 if feasibility != 2 else 0, dtype=torch.float32))
 
-        print(count)
         return (
             torch.stack(batches_c),
             torch.stack(batches_A),
@@ -262,11 +261,11 @@ class LPGNN(nn.Module):
             return "Please, choose one type of function: feas, obj or sol"
 
 ########################
-# Test GNN model to LP #
+# Generate Train Data  #
 ########################
 
-num_constraints = 5
-num_variables = 10
+num_constraints = 10
+num_variables = 50
 batch_size = 2
 out_func = 'sol'
 
@@ -276,5 +275,49 @@ for i in range(50):
                                                                                    num_variables,
                                                                                    num_constraints,
                                                                                    out_func)
-    print("Modelos gerados", i)
     data_train.append([c, A, b, constraints, l, u, solution, feasibility])
+
+def train(model, c, A, b, constraint, l, u, sol, feas, out_func, optimizer):
+    optimizer.zero_grad()
+
+    #model = LPGNN(num_constraints, num_variables)
+
+    out = model.forward(c, A, b, constraint, l, u, out_func)
+
+    print(feas, out)
+    loss = nn.MSELoss()
+    if out_func == 'feas':
+        loss = loss(out, feas)
+    elif out_func == 'obj':
+        loss = loss(out, c.T @ sol)
+    else:
+        loss = loss(out, sol)
+    loss.backward()
+    optimizer.step()
+    return loss
+
+device = device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+model = LPGNN(num_constraints, num_variables).to(device)
+
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+
+out_func = 'sol'
+
+# training model
+epochs = 10
+pbar = tqdm(range(epochs))
+
+for epoch in pbar:
+    for batch in data_train:
+        c, A, b, constraints, l, u, sol, feas = batch
+        c = c.to(device)
+        A = A.to(device)
+        b = b.to(device)
+        constraints = constraints.to(device)
+        l = l.to(device)
+        u = u.to(device)
+        sol = sol.to(device)
+        feas = feas.to(device)
+        loss = train(model, c, A, b, constraints, l, u, sol, feas, out_func, optimizer)
+        pbar.set_description(f"%.8f" % loss)
