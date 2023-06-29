@@ -11,7 +11,7 @@ import torch_geometric.nn as G
 # Generate Linear models #
 ##########################
 
-def generate_random_linear_program(num_variables, num_constraints, lower_bound):
+def generate_random_linear_program(num_variables, num_constraints, bound):
     # Generate random coefficients for the objective function
     c = np.random.rand(num_variables)
 
@@ -22,19 +22,19 @@ def generate_random_linear_program(num_variables, num_constraints, lower_bound):
     b = np.random.rand(num_constraints)
 
     # Generate random lower and upper bounds for the variables
-    lower_bounds = np.random.choice([lower_bound, np.random.rand()], size=num_variables)
-    upper_bounds = np.random.choice([lower_bound, np.random.rand()], size=num_variables)
+    lower_bounds = np.random.choice([bound, np.random.rand()], size=num_variables)
+    upper_bounds = np.random.choice([-bound, np.random.rand()], size=num_variables)
 
     # Set the bounds for the variables
     bounds = list(zip(lower_bounds, upper_bounds))
 
     # Generate random constraint types (0 for <= and 1 for =)
-    constraint_types = np.random.choice([0, 1], size=num_constraints)
+    constraint_types = np.random.choice([0, 1], size=num_constraints, p=[0.7, 0.3])
 
     # Adjust the constraint matrix and right-hand side based on the constraint types
     for i in range(num_constraints):
         if constraint_types[i] == 1:  # Equality constraint
-            A[i] = np.random.choice([0, 1]) * A[i]  # Randomly multiply constraint coefficients by 0 or 1
+            A[i] = np.random.choice([0, 1], p=[0.95, 0.05]) * A[i]  # Randomly multiply constraint coefficients by 0 or 1
             b[i] = np.dot(A[i], np.random.rand(num_variables))  # Randomly generate a feasible solution
 
     # Return the generated linear program
@@ -58,6 +58,8 @@ def generate_and_solve_batches(num_batches, num_variables, num_constraints, out_
     batches_upper_bounds = []
     batches_solutions = []
     batches_feasibility = []
+
+    count = 0
     
     if out_func == 'feas':
         for _ in range(num_batches):
@@ -100,7 +102,7 @@ def generate_and_solve_batches(num_batches, num_variables, num_constraints, out_
                                                                                num_constraints,
                                                                               -1_000_000)
             solution, feasibility = solve_linear_program(c, A, b, constraint_types, bounds)
-            
+            count += 1
             if (type(solution) == type(None)):
                 continue
             
@@ -115,6 +117,7 @@ def generate_and_solve_batches(num_batches, num_variables, num_constraints, out_
             batches_solutions.append(torch.zeros(num_variables, dtype=torch.float32))
             batches_feasibility.append(torch.tensor(1 if feasibility != 2 else 0, dtype=torch.float32))
 
+        print(count)
         return (
             torch.stack(batches_c),
             torch.stack(batches_A),
@@ -262,8 +265,8 @@ class LPGNN(nn.Module):
 # Test GNN model to LP #
 ########################
 
-num_constraints = 10
-num_variables = 50
+num_constraints = 5
+num_variables = 10
 batch_size = 2
 out_func = 'sol'
 
@@ -273,5 +276,5 @@ for i in range(50):
                                                                                    num_variables,
                                                                                    num_constraints,
                                                                                    out_func)
-    
+    print("Modelos gerados", i)
     data_train.append([c, A, b, constraints, l, u, solution, feasibility])
