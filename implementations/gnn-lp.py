@@ -22,8 +22,8 @@ def generate_random_linear_program(num_variables, num_constraints, bound):
     b = np.random.rand(num_constraints)
 
     # Generate random lower and upper bounds for the variables
-    lower_bounds = np.random.choice([bound, np.random.rand()], size=num_variables)
-    upper_bounds = np.random.choice([-bound, np.random.rand()], size=num_variables)
+    lower_bounds = np.ones(num_variables) * -bound
+    upper_bounds = np.ones(num_variables) * bound
 
     # Set the bounds for the variables
     bounds = list(zip(lower_bounds, upper_bounds))
@@ -100,7 +100,7 @@ def generate_and_solve_batches(num_batches, num_variables, num_constraints, out_
         while len(batches_c) != num_batches:
             c, A, b, constraint_types, bounds = generate_random_linear_program(num_variables,
                                                                                num_constraints,
-                                                                              -1_000_000)
+                                                                              1_000_000)
             solution, feasibility = solve_linear_program(c, A, b, constraint_types, bounds)
             count += 1
             if (type(solution) == type(None)):
