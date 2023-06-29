@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 from scipy.optimize import linprog
 from tqdm import tqdm
+import random as rd
 
 import torch_geometric.nn as G
 
@@ -11,15 +12,25 @@ import torch_geometric.nn as G
 # Generate Linear models #
 ##########################
 
-def generate_random_linear_program(num_variables, num_constraints, bound):
+def generate_random_linear_program(num_variables, num_constraints, bound, nnz = 100):
     # Generate random coefficients for the objective function
-    c = np.random.rand(num_variables)
+    c = np.random.uniform(-1, 1, num_variables) * 0.01
 
     # Generate random coefficients for the constraint matrix
-    A = np.random.rand(num_constraints, num_variables)
+    A = np.zeros((num_constraints, num_variables))
+    EdgeIndex = np.zeros((nnz, 2))
+    EdgeIndex1D = rd.sample(range(num_constraints * num_variables), nnz)
+    EdgeFeature = np.random.normal(0, 1, nnz)
+        
+    for l in range(nnz):
+        i = int(EdgeIndex1D[l] / num_variables)
+        j = EdgeIndex1D[l] - i * num_variables
+        EdgeIndex[l, 0] = i
+        EdgeIndex[l, 1] = j
+        A[i, j] = EdgeFeature[l]
 
     # Generate random right-hand side values for the constraints
-    b = np.random.rand(num_constraints)
+    b = np.random.uniform(-1, 1, num_constraints)
 
     # Generate random lower and upper bounds for the variables
     lower_bounds = np.ones(num_variables) * -bound
@@ -34,7 +45,6 @@ def generate_random_linear_program(num_variables, num_constraints, bound):
     # Adjust the constraint matrix and right-hand side based on the constraint types
     for i in range(num_constraints):
         if constraint_types[i] == 1:  # Equality constraint
-            A[i] = np.random.choice([0, 1], p=[0.80, 0.20]) * A[i]  # Randomly multiply constraint coefficients by 0 or 1
             b[i] = np.dot(A[i], np.random.rand(num_variables))  # Randomly generate a feasible solution
 
     # Return the generated linear program
@@ -321,3 +331,8 @@ for epoch in pbar:
         feas = feas.to(device)
         loss = train(model, c, A, b, constraints, l, u, sol, feas, out_func, optimizer)
         pbar.set_description(f"%.8f" % loss)
+
+#c, A, b, constraint_types, bounds = generate_random_linear_program(50, 10, 1_000_000)
+
+#print(c, A, b, constraint_types, bounds)
+#print(c.shape, A.shape, b.shape, constraint_types.shape, bounds.shape)
