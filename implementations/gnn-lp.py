@@ -46,6 +46,8 @@ def solve_linear_program(c, A, b, constraint_types, bounds):
     res = linprog(c, A_ub=A[constraint_types == 0], b_ub=b[constraint_types == 0],
                   A_eq=A[constraint_types == 1], b_eq=b[constraint_types == 1], bounds=bounds)
 
+    print(res)
+
     # Return the solution
     return res.x, res.status
 
@@ -58,8 +60,6 @@ def generate_and_solve_batches(num_batches, num_variables, num_constraints, out_
     batches_upper_bounds = []
     batches_solutions = []
     batches_feasibility = []
-
-    count = 0
     
     if out_func == 'feas':
         for _ in range(num_batches):
@@ -102,7 +102,7 @@ def generate_and_solve_batches(num_batches, num_variables, num_constraints, out_
                                                                                num_constraints,
                                                                               1_000_000)
             solution, feasibility = solve_linear_program(c, A, b, constraint_types, bounds)
-            count += 1
+
             if (type(solution) == type(None)):
                 continue
             
