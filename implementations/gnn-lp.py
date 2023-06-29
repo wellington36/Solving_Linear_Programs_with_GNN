@@ -12,7 +12,7 @@ import torch_geometric.nn as G
 # Generate Linear models #
 ##########################
 
-def generate_random_linear_program(num_variables, num_constraints, bound, nnz = 100):
+def generate_random_linear_program(num_variables, num_constraints, nnz = 100):
     # Generate random coefficients for the objective function
     c = np.random.uniform(-1, 1, num_variables) * 0.01
 
@@ -32,12 +32,13 @@ def generate_random_linear_program(num_variables, num_constraints, bound, nnz = 
     # Generate random right-hand side values for the constraints
     b = np.random.uniform(-1, 1, num_constraints)
 
-    # Generate random lower and upper bounds for the variables
-    lower_bounds = np.ones(num_variables) * -bound
-    upper_bounds = np.ones(num_variables) * bound
-
-    # Set the bounds for the variables
-    bounds = list(zip(lower_bounds, upper_bounds))
+    bounds = np.random.normal(0, 10, size = (num_variables, 2))
+        
+    for j in range(num_variables):
+        if bounds[j, 0] > bounds[j, 1]:
+            temp = bounds[j, 0]
+            bounds[j, 0] = bounds[j, 1]
+            bounds[j, 1] = temp
 
     # Generate random constraint types (0 for <= and 1 for =)
     constraint_types = np.random.choice([0, 1], size=num_constraints, p=[0.7, 0.3])
@@ -56,8 +57,6 @@ def solve_linear_program(c, A, b, constraint_types, bounds):
     res = linprog(c, A_ub=A[constraint_types == 0], b_ub=b[constraint_types == 0],
                   A_eq=A[constraint_types == 1], b_eq=b[constraint_types == 1], bounds=bounds)
 
-    print(res)
-
     # Return the solution
     return res.x, res.status
 
@@ -74,8 +73,7 @@ def generate_and_solve_batches(num_batches, num_variables, num_constraints, out_
     if out_func == 'feas':
         for _ in range(num_batches):
             c, A, b, constraint_types, bounds = generate_random_linear_program(num_variables,
-                                                                               num_constraints,
-                                                                               float('inf'))
+                                                                               num_constraints)
 
             solution, feasibility = solve_linear_program(c, A, b, constraint_types, bounds)
 
@@ -109,8 +107,7 @@ def generate_and_solve_batches(num_batches, num_variables, num_constraints, out_
     else:
         while len(batches_c) != num_batches:
             c, A, b, constraint_types, bounds = generate_random_linear_program(num_variables,
-                                                                               num_constraints,
-                                                                              1_000_000)
+                                                                               num_constraints)
             solution, feasibility = solve_linear_program(c, A, b, constraint_types, bounds)
 
             if (type(solution) == type(None)):
@@ -277,10 +274,11 @@ class LPGNN(nn.Module):
 num_constraints = 10
 num_variables = 50
 batch_size = 2
+N = 10
 out_func = 'sol'
 
 data_train = []
-for i in range(50):
+for i in range(N):
     c, A, b, constraints, l, u, solution, feasibility = generate_and_solve_batches(batch_size,
                                                                                    num_variables,
                                                                                    num_constraints,
@@ -315,7 +313,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 out_func = 'sol'
 
 # training model
-epochs = 10
+epochs = 1
 pbar = tqdm(range(epochs))
 
 for epoch in pbar:
@@ -332,7 +330,29 @@ for epoch in pbar:
         loss = train(model, c, A, b, constraints, l, u, sol, feas, out_func, optimizer)
         pbar.set_description(f"%.8f" % loss)
 
-#c, A, b, constraint_types, bounds = generate_random_linear_program(50, 10, 1_000_000)
+## Test model
+#num_constraints = 10
+#num_variables = 50
+#batch_size = 10
+#N = 10
+#out_func = 'sol'
+#
+#data_test = []
+#for i in range(N):
+#    c, A, b, constraints, l, u, solution, feasibility = generate_and_solve_batches(batch_size,
+#                                                                                   num_variables,
+#                                                                                   num_constraints,
+#                                                                                   out_func)
+#    data_test.append([c, A, b, constraints, l, u, solution, feasibility])
+#
+#def test(model, c, A, b, constraint, l, u, sol, feas, out_func):
+#    out = model.forward(c, A, b, constraint, l, u, out_func)
+#    loss = nn.MSELoss()
+#    if out_func == 'feas':
+#        loss = loss(out, feas)
+#    elif out_func == 'obj':
+#        loss = loss(out, c.T @ sol)
+#    else:
+#        loss = loss(out, sol)
+#    return loss
 
-#print(c, A, b, constraint_types, bounds)
-#print(c.shape, A.shape, b.shape, constraint_types.shape, bounds.shape)
