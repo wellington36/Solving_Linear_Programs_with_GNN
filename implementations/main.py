@@ -59,10 +59,31 @@ for i in range(N):
                                                                                    out_func)
     data_train.append([c, A, b, constraints, l, u, solution, feasibility])
 
+init_epochs = 300
 epochs = 50
-sum_epochs = 0
+sum_epochs = init_epochs
 
-for _ in range(5):
+pbar = tqdm(range(init_epochs))
+
+for epoch in pbar:
+    for batch in data_train:
+        c, A, b, constraints, l, u, sol, feas = batch
+    
+        c = c.to(device)
+        A = A.to(device)
+        b = b.to(device)
+        constraints = constraints.to(device)
+        l = l.to(device)
+        u = u.to(device)
+        sol = sol.to(device)
+        feas = feas
+    
+        loss = train(model, c, A, b, constraints, l, u, sol, feas, out_func, optimizer)
+        pbar.set_description(f"%.8f" % loss)
+
+torch.save(model.state_dict(), f'gnn_backup/bkp_{out_func}_{sum_epochs}.pt')
+
+for _ in range(10):
     sum_epochs += epochs
     pbar = tqdm(range(epochs))
 
@@ -82,4 +103,4 @@ for _ in range(5):
             loss = train(model, c, A, b, constraints, l, u, sol, feas, out_func, optimizer)
             pbar.set_description(f"%.8f" % loss)
     
-    torch.save(model.state_dict(), f'gnn_backup/bkp_obj_{sum_epochs}.pt')
+    torch.save(model.state_dict(), f'gnn_backup/bkp_{out_func}_{sum_epochs}.pt')
