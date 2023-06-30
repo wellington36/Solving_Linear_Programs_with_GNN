@@ -3,7 +3,7 @@ import torch
 import torch_geometric.nn as G
 import torch.nn as nn
 
-class LPGNN(nn.Module):
+class LPGCN(nn.Module):
     ''' 
     A GNN model for solving linear programs. The LP is modeled as a weighted bipartite graph with constraints on the left and
     variables on the right. The optimization problems are of the form: min c^T x s.t. Ax (constraints) b, l <= x <= u
