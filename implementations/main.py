@@ -34,7 +34,7 @@ def test(model, c, A, b, constraint, l, u, sol, feas, out_func):
     if out_func == 'feas':
         loss = loss(out, feas)
     elif out_func == 'obj':
-        loss = loss(out, c.T @ sol)
+        loss = loss(out[:,0], torch.sum(c * sol, dim=1))
     else:
         loss = loss(out, sol)
     return loss
@@ -45,7 +45,7 @@ num_variables = 5
 batch_size = 10
 learning_rate = 0.003
 N = 100
-out_func = 'sol'
+out_func = 'feas'
 
 device = device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 model = LPGCN(num_constraints, num_variables).to(device)
@@ -59,7 +59,7 @@ for i in range(N):
                                                                                    out_func)
     data_train.append([c, A, b, constraints, l, u, solution, feasibility])
 
-init_epochs = 300
+init_epochs = 50
 epochs = 50
 sum_epochs = init_epochs
 
