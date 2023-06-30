@@ -12,7 +12,7 @@ import torch_geometric.nn as G
 # Generate Linear models #
 ##########################
 
-def generate_random_linear_program(num_variables, num_constraints, nnz = 100):
+def generate_random_linear_program(num_variables, num_constraints, nnz = 5):
     # Generate random coefficients for the objective function
     c = np.random.uniform(-1, 1, num_variables) * 0.01
 
@@ -121,7 +121,7 @@ def generate_and_solve_batches(num_batches, num_variables, num_constraints, out_
             batches_constraint_types.append(torch.tensor(constraint_types, dtype=torch.float32))
             batches_lower_bounds.append(torch.tensor(lower_bounds, dtype=torch.float32))
             batches_upper_bounds.append(torch.tensor(upper_bounds, dtype=torch.float32))
-            batches_solutions.append(torch.zeros(num_variables, dtype=torch.float32))
+            batches_solutions.append(torch.tensor(solution, dtype=torch.float32))
             batches_feasibility.append(torch.tensor(1 if feasibility != 2 else 0, dtype=torch.float32))
 
         return (
@@ -271,8 +271,8 @@ class LPGNN(nn.Module):
 # Generate Train Data  #
 ########################
 
-num_constraints = 10
-num_variables = 50
+num_constraints = 2
+num_variables = 5
 batch_size = 2
 N = 10
 out_func = 'sol'
@@ -313,7 +313,10 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 out_func = 'sol'
 
 # training model
-epochs = 1
+print("\n\n")
+print("Training model")
+print("\n\n")
+epochs = 100
 pbar = tqdm(range(epochs))
 
 for epoch in pbar:
@@ -330,29 +333,44 @@ for epoch in pbar:
         loss = train(model, c, A, b, constraints, l, u, sol, feas, out_func, optimizer)
         pbar.set_description(f"%.8f" % loss)
 
-## Test model
-#num_constraints = 10
-#num_variables = 50
-#batch_size = 10
-#N = 10
-#out_func = 'sol'
-#
-#data_test = []
-#for i in range(N):
-#    c, A, b, constraints, l, u, solution, feasibility = generate_and_solve_batches(batch_size,
-#                                                                                   num_variables,
-#                                                                                   num_constraints,
-#                                                                                   out_func)
-#    data_test.append([c, A, b, constraints, l, u, solution, feasibility])
-#
-#def test(model, c, A, b, constraint, l, u, sol, feas, out_func):
-#    out = model.forward(c, A, b, constraint, l, u, out_func)
-#    loss = nn.MSELoss()
-#    if out_func == 'feas':
-#        loss = loss(out, feas)
-#    elif out_func == 'obj':
-#        loss = loss(out, c.T @ sol)
-#    else:
-#        loss = loss(out, sol)
-#    return loss
+# Test model
+print("\n\n")
+print("Testing model")
+print("\n\n")
+M = 10
+out_func = 'sol'
 
+data_test = []
+for i in range(N):
+    c, A, b, constraints, l, u, solution, feasibility = generate_and_solve_batches(batch_size,
+                                                                                   num_variables,
+                                                                                   num_constraints,
+                                                                                   out_func)
+    data_test.append([c, A, b, constraints, l, u, solution, feasibility])
+
+def test(model, c, A, b, constraint, l, u, sol, feas, out_func):
+    out = model.forward(c, A, b, constraint, l, u, out_func)
+    loss = nn.MSELoss()
+    if out_func == 'feas':
+        loss = loss(out, feas)
+    elif out_func == 'obj':
+        loss = loss(out, c.T @ sol)
+    else:
+        loss = loss(out, sol)
+        print(out, sol)
+    return loss
+
+
+for batch in data_test:
+    c, A, b, constraints, l, u, sol, feas = batch
+    c = c.to(device)
+    A = A.to(device)
+    b = b.to(device)
+    constraints = constraints.to(device)
+    l = l.to(device)
+    u = u.to(device)
+    sol = sol.to(device)
+    feas = feas.to(device)
+
+    loss = test(model, c, A, b, constraints, l, u, sol, feas, out_func)
+    print(loss)
